@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
-from controllers.activity_controller import router
+from controllers.activity_controller import router as activity_router
+from controllers.auth_controller import router as auth_router
 
 
 app = FastAPI(
@@ -10,4 +11,5 @@ app = FastAPI(
     ),
 )
 
-app.include_router(router)
+app.include_router(activity_router)
+app.include_router(auth_router)
