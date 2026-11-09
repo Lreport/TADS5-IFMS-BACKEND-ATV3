@@ -14,12 +14,18 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
+from controllers.auth_controller import require_authenticated_user
 from database import get_session
 from models import activity as activity_model
 from models.activity import Activity, ActivityInput, ActivityOutput, Subject
 
 
-router = APIRouter(prefix="/activities", tags=["Activities"])
+router = APIRouter(
+    prefix="/activities",
+    tags=["Activities"],
+    dependencies=[Depends(require_authenticated_user)],
+    responses={401: {"description": "Autenticação Bearer obrigatória."}},
+)
 
 
 @router.post(

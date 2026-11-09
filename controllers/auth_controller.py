@@ -1,4 +1,4 @@
-"""Recebe as credenciais do aluno e emite o token de acesso."""
+"""Emite e valida os tokens de acesso do aluno."""
 
 from datetime import datetime, timedelta, timezone
 from os import getenv
@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 import jwt
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.exc import PasswordSizeError
 from passlib.hash import argon2
 from pydantic import BaseModel
@@ -20,6 +20,7 @@ from models.user import User
 
 
 router = APIRouter(tags=["Autenticação"])
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_LIFETIME = timedelta(minutes=30)
 
@@ -50,6 +51,42 @@ def get_jwt_secret() -> str:
             detail="Autenticação indisponível. Configure JWT_SECRET_KEY no servidor.",
         )
     return secret
+
+
+def require_authenticated_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    secret: Annotated[str, Depends(get_jwt_secret)],
+    session: Annotated[Session, Depends(get_session)],
+) -> None:
+    """Exige um JWT válido associado a um aluno cadastrado.
+
+    Args:
+        token (str): JWT enviado no cabeçalho Authorization.
+        secret (str): Chave usada para verificar a assinatura do token.
+        session (Session): Sessão usada para consultar a conta do aluno.
+
+    Raises:
+        HTTPException: Retorna 401 se o token for inválido ou a conta não existir.
+    """
+    credentials_error = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Token inválido ou expirado.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        claims = jwt.decode(
+            token,
+            secret,
+            algorithms=[JWT_ALGORITHM],
+            options={"require": ["sub", "iat", "exp"]},
+        )
+        user_id = int(claims["sub"])
+    except (jwt.InvalidTokenError, ValueError) as error:
+        raise credentials_error from error
+
+    # O SQLite aceita apenas inteiros de 64 bits para o identificador.
+    if not 0 < user_id <= 2**63 - 1 or session.get(User, user_id) is None:
+        raise credentials_error
 
 
 def _authenticate_user(email: str, password: str, session: Session) -> User | None:

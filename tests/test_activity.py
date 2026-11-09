@@ -8,9 +8,38 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from passlib.hash import argon2
 from sqlalchemy import Engine
+from sqlalchemy.orm import Session
 
 from models.activity import Subject
+from models.user import User
+
+
+pytestmark = pytest.mark.usefixtures("authenticate_activity_client")
+
+
+@pytest.fixture
+def authenticate_activity_client(
+    client: TestClient, database_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cadastra um aluno e autentica o cliente antes de testar o CRUD.
+
+    Args:
+        client (TestClient): Cliente HTTP que recebe o cabeçalho Bearer.
+        database_engine (Engine): Conexão com o banco temporário dos testes.
+        monkeypatch (pytest.MonkeyPatch): Configura a chave de assinatura de teste.
+    """
+    email = "aluno@example.com"
+    password = "senha de teste longa"
+    monkeypatch.setenv("JWT_SECRET_KEY", "chave-para-testes-do-crud-sem-uso-real")
+    with Session(database_engine) as session:
+        session.add(User(email=email, password_hash=argon2.hash(password)))
+        session.commit()
+
+    response = client.post("/token", data={"username": email, "password": password})
+    assert response.status_code == 200
+    client.headers["Authorization"] = f"Bearer {response.json()['access_token']}"
 
 
 def test_create_and_get_activity(client: TestClient) -> None:

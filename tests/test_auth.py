@@ -1,4 +1,6 @@
-"""Verifica o login e a emissão do token pelo endpoint HTTP."""
+"""Verifica o login e o controle de acesso aos endpoints HTTP."""
+
+from datetime import datetime, timedelta, timezone
 
 import jwt
 import pytest
@@ -97,3 +99,53 @@ def test_login_requires_secret(
 
     assert response.status_code == 503
     assert "access_token" not in response.json()
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("GET", "/activities"),
+        ("GET", "/activities/1"),
+        ("POST", "/activities"),
+        ("PUT", "/activities/1"),
+        ("DELETE", "/activities/1"),
+    ],
+)
+def test_activity_routes_require_token(client: TestClient, method: str, path: str) -> None:
+    """Verifica se cada rota de atividade recusa acesso sem token.
+
+    Args:
+        client (TestClient): Cliente HTTP sem autenticação.
+        method (str): Método HTTP da operação.
+        path (str): Caminho da rota testada.
+    """
+    response = client.request(method, path)
+
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"] == "Bearer"
+
+
+@pytest.mark.parametrize("failure", ["signature", "expired", "unknown_user", "no_exp"])
+def test_activity_rejects_invalid_token(
+    client: TestClient, student: int, failure: str
+) -> None:
+    """Verifica se a API rejeita tokens que não atendem às regras de acesso.
+
+    Args:
+        client (TestClient): Cliente HTTP da API com banco temporário.
+        student (int): Identificador da conta usada como referência.
+        failure (str): Condição que torna o token inválido.
+    """
+    now = datetime.now(timezone.utc)
+    subject = str(student + 1 if failure == "unknown_user" else student)
+    expires = now + timedelta(seconds=-1 if failure == "expired" else 300)
+    claims = {"sub": subject, "iat": now - timedelta(minutes=1), "exp": expires}
+    if failure == "no_exp":
+        del claims["exp"]
+    secret = TEST_SECRET + "-different" if failure == "signature" else TEST_SECRET
+    token = jwt.encode(claims, secret, algorithm="HS256")
+
+    response = client.get("/activities", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"] == "Bearer"
