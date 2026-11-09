@@ -18,6 +18,11 @@ MIN_PASSWORD_LENGTH = 12
 
 
 def main() -> int:
+    """Cria a conta do aluno com as credenciais informadas no terminal.
+
+    Returns:
+        int: 0 quando a conta é criada ou 1 quando o cadastro é recusado ou cancelado.
+    """
     with SessionLocal() as session:
         if session.get(User, STUDENT_USER_ID) is not None:
             print("Já existe uma conta de aluno.", file=sys.stderr)

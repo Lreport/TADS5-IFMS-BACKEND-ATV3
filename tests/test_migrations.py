@@ -58,6 +58,11 @@ def test_database_rejects_unknown_subject(database_engine: Engine) -> None:
 
 
 def test_user_migration_preserves_existing_activities(migration_config: Config) -> None:
+    """Verifica se as atividades são preservadas ao aplicar e reverter a migração.
+
+    Args:
+        migration_config (Config): Configuração do Alembic para o banco temporário.
+    """
     command.upgrade(migration_config, "50f0ee0bf44c")
     engine = create_engine(migration_config.get_main_option("sqlalchemy.url"))
     try:

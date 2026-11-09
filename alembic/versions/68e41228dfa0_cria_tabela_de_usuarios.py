@@ -15,6 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    """Cria a tabela de usuários com e-mail único e hash de senha obrigatório."""
     op.create_table(
         "users",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -25,4 +26,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Remove a tabela de usuários e os dados armazenados nela."""
     op.drop_table("users")
