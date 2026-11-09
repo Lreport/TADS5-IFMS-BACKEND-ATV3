@@ -5,8 +5,8 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine, pool
 
-from database import DATABASE_URL
-from models.activity import Activity
+from database import DATABASE_URL, Base
+from models import activity, user  # Importa os modelos para registrar as tabelas.
 
 
 config = context.config
@@ -14,7 +14,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = Activity.metadata
+target_metadata = Base.metadata
 database_url = config.get_main_option("sqlalchemy.url") or DATABASE_URL
 
 

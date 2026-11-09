@@ -57,6 +57,34 @@ def test_database_rejects_unknown_subject(database_engine: Engine) -> None:
             )
 
 
+def test_user_migration_preserves_existing_activities(migration_config: Config) -> None:
+    command.upgrade(migration_config, "50f0ee0bf44c")
+    engine = create_engine(migration_config.get_main_option("sqlalchemy.url"))
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO activities (title, subject) VALUES (:title, :subject)"
+                ),
+                {"title": "Atividade existente", "subject": "Fundamentos de Estatística"},
+            )
+
+        command.upgrade(migration_config, "head")
+        assert "users" in inspect(engine).get_table_names()
+        command.check(migration_config)
+        with engine.connect() as connection:
+            title = connection.scalar(text("SELECT title FROM activities"))
+            assert title == "Atividade existente"
+
+        command.downgrade(migration_config, "50f0ee0bf44c")
+        assert "users" not in inspect(engine).get_table_names()
+        with engine.connect() as connection:
+            title = connection.scalar(text("SELECT title FROM activities"))
+            assert title == "Atividade existente"
+    finally:
+        engine.dispose()
+
+
 def test_migration_can_generate_sql(migration_config: Config) -> None:
     """Permite gerar o SQL inicial sem conectar ao banco.
 
