@@ -20,7 +20,7 @@ def test_create_user_stores_hash_and_rejects_second_account(
     """
     monkeypatch.setattr(create_user, "SessionLocal", sessionmaker(database_engine))
     emails = iter(("aluno@EXAMPLE.COM", "outro@example.com"))
-    password = "senha de teste longa"
+    password = "abcd"
     monkeypatch.setattr("builtins.input", lambda prompt: next(emails))
     monkeypatch.setattr(create_user, "getpass", lambda prompt: password)
 
@@ -34,18 +34,28 @@ def test_create_user_stores_hash_and_rejects_second_account(
         assert argon2.verify(password, user.password_hash)
 
 
-def test_create_user_rejects_different_passwords(
-    database_engine: Engine, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("password", "confirmation"),
+    [("abc", "abc"), ("abcd", "efgh")],
+    ids=["senha-curta", "confirmacao-diferente"],
+)
+def test_create_user_rejects_invalid_password(
+    database_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+    password: str,
+    confirmation: str,
 ) -> None:
-    """Verifica se senhas diferentes impedem a criação da conta.
+    """Verifica se senhas curtas ou sem confirmação impedem a criação da conta.
 
     Args:
         database_engine (Engine): Conexão com o banco temporário dos testes.
-        monkeypatch (pytest.MonkeyPatch): Substitui a sessão e simula senhas diferentes.
+        monkeypatch (pytest.MonkeyPatch): Substitui a sessão e as entradas do terminal.
+        password (str): Senha informada no cadastro.
+        confirmation (str): Confirmação informada no cadastro.
     """
     monkeypatch.setattr(create_user, "SessionLocal", sessionmaker(database_engine))
     monkeypatch.setattr("builtins.input", lambda prompt: "aluno@example.com")
-    passwords = iter(("senha de teste longa", "outra senha de teste"))
+    passwords = iter((password, confirmation))
     monkeypatch.setattr(create_user, "getpass", lambda prompt: next(passwords))
 
     assert create_user.main() == 1

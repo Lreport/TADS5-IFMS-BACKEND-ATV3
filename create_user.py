@@ -5,6 +5,7 @@ from getpass import GetPassWarning, getpass
 from warnings import catch_warnings, simplefilter
 
 from email_validator import EmailNotValidError, validate_email
+from passlib.exc import PasswordSizeError
 from passlib.hash import argon2
 from sqlalchemy.exc import IntegrityError
 
@@ -14,7 +15,7 @@ from models.user import User
 
 # As execucoes do comando disputam a mesma chave, mesmo se forem simultaneas.
 STUDENT_USER_ID = 1
-MIN_PASSWORD_LENGTH = 12
+MIN_PASSWORD_LENGTH = 4
 
 
 def main() -> int:
@@ -48,7 +49,7 @@ def main() -> int:
 
     if len(password) < MIN_PASSWORD_LENGTH or not password.strip():
         print(
-            f"Informe uma senha com pelo menos {MIN_PASSWORD_LENGTH} caracteres.",
+            f"Informe uma senha preenchida com pelo menos {MIN_PASSWORD_LENGTH} caracteres.",
             file=sys.stderr,
         )
         return 1
@@ -56,10 +57,14 @@ def main() -> int:
         print("As senhas não coincidem.", file=sys.stderr)
         return 1
 
-    user = User(id=STUDENT_USER_ID, email=email, password_hash=argon2.hash(password))
     try:
+        password_hash = argon2.hash(password)
+        user = User(id=STUDENT_USER_ID, email=email, password_hash=password_hash)
         with SessionLocal.begin() as session:
             session.add(user)
+    except PasswordSizeError:
+        print("A senha excede o tamanho aceito pelo Passlib.", file=sys.stderr)
+        return 1
     except IntegrityError:
         print("Já existe uma conta de aluno ou esse e-mail está em uso.", file=sys.stderr)
         return 1
